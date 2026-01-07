@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INDIE PRESS STUDIO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400;500;600&family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        serif: ['Merriweather', 'serif'],
+                        display: ['Playfair Display', 'serif'],
+                        logo: ['Cinzel', 'serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            900: '#0c4a6e',
+                        },
+                        paper: '#f8fafc',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #f8fafc; color: #0f172a; }
+        
+        /* 3D Book Cover Optimized */
+        .book-card { perspective: 1000px; }
+        .book-inner {
+            width: 100%; height: 100%;
+            transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            transform-style: preserve-3d;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            background-size: cover;
+            background-position: center;
+        }
+        .book-card:hover .book-inner {
+            transform: rotateY(-10deg) translateY(-5px);
+            box-shadow: 5px 15px 25px rgba(0,0,0,0.2);
+        }
+        
+        .book-spine {
+            background: linear-gradient(90deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0) 20%, rgba(0,0,0,0.1) 100%);
+            position: absolute; left: 0; top: 0; bottom: 0; width: 12px; z-index: 10;
+        }
+
+        /* Editor Styling */
+        [contenteditable]:empty:before {
+            content: attr(placeholder);
+            color: #94a3b8;
+            cursor: text;
+        }
+        
+        /* Typography for Editor Content */
+        .prose p { margin-bottom: 1.5em; line-height: 1.8; }
+        .prose h1 { font-size: 2em; font-weight: bold; margin-bottom: 0.5em; margin-top: 1em; }
+        .prose h2 { font-size: 1.5em; font-weight: bold; margin-bottom: 0.5em; margin-top: 1em; }
+        .prose blockquote { border-left: 4px solid #cbd5e1; padding-left: 1em; font-style: italic; color: #64748b; }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden bg-slate-50 text-slate-900 transition-colors duration-300" id="main-body">
+
+    <!-- TOP NAVIGATION -->
+    <nav class="bg-slate-900 text-white px-6 py-3 flex justify-between items-center z-50 shadow-lg shrink-0">
+        <div class="flex items-center gap-6">
+            <div class="flex items-center gap-2 cursor-pointer hover:opacity-90 transition" onclick="showView('storefront')">
+                <i class="ph-fill ph-book-open-text text-3xl text-sky-400"></i>
+                <div>
+                    <h1 class="font-logo font-bold text-xl tracking-wider leading-none">IndiePress</h1>
+                    <span class="text-[10px] text-slate-400 uppercase tracking-widest">Studio & Library</span>
+                </div>
+            </div>
+            
+            <div class="hidden md:flex items-center relative w-96">
+                <input type="text" id="search-input" placeholder="Cari perpustakaan..." class="w-full pl-10 pr-4 py-2 rounded bg-slate-800 border border-slate-700 text-sm text-white focus:outline-none focus:border-sky-500 focus:ring-1 transition" oninput="filterBooks()">
+                <i class="ph ph-magnifying-glass absolute left-3 text-slate-400"></i>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-4">
+            <!-- Backup Actions -->
+            <div class="flex gap-2 mr-4 border-r border-slate-700 pr-4">
+                <button onclick="exportData()" class="text-slate-400 hover:text-white text-xs flex flex-col items-center gap-1" title="Backup Data">
+                    <i class="ph ph-download-simple text-lg"></i>
+                </button>
+                <label for="import-file" class="text-slate-400 hover:text-white text-xs flex flex-col items-center gap-1 cursor-pointer" title="Restore Data">
+                    <i class="ph ph-upload-simple text-lg"></i>
+                    <input type="file" id="import-file" class="hidden" accept=".json" onchange="importData(this)">
+                </label>
+            </div>
+
+            <button onclick="createNewBook()" class="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-md text-sm font-semibold shadow-md flex items-center gap-2 transition">
+                <i class="ph-bold ph-plus"></i> <span class="hidden sm:inline">Buat Buku</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- CONTENT AREA -->
+    <div class="flex-1 relative overflow-hidden">
+        
+        <!-- VIEW 1: STOREFRONT -->
+        <main id="view-storefront" class="absolute inset-0 overflow-y-auto p-6 md:p-10 transition-opacity duration-300 bg-slate-50">
+            <div class="max-w-7xl mx-auto">
+                <div class="bg-gradient-to-r from-slate-800 to-slate-900 rounded-xl p-8 mb-10 text-white shadow-xl relative overflow-hidden">
+                    <div class="relative z-10">
+                        <h2 class="font-display text-3xl md:text-4xl font-bold mb-2">Workspace Penulis</h2>
+                        <p class="text-slate-300 max-w-xl text-sm md:text-base">Tempat ide menjadi naskah. Jangan lupa lakukan Backup data secara berkala.</p>
+                    </div>
+                    <i class="ph-fill ph-typewriter absolute -right-4 -bottom-8 text-9xl text-white opacity-5"></i>
+                </div>
+
+                <div class="flex gap-2 overflow-x-auto pb-4 mb-4 scrollbar-hide">
+                    <button class="px-4 py-1.5 rounded-full bg-slate-800 text-white text-xs font-medium" onclick="filterGenre('all')">Semua</button>
+                    <button class="px-4 py-1.5 rounded-full bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-medium" onclick="filterGenre('Fiksi')">Fiksi</button>
+                    <button class="px-4 py-1.5 rounded-full bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-medium" onclick="filterGenre('Non-Fiksi')">Non-Fiksi</button>
+                </div>
+
+                <div id="book-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 md:gap-8 pb-20">
+                    <!-- Books Injected Here -->
+                </div>
+                
+                <div id="empty-state" class="hidden flex flex-col items-center justify-center py-20 opacity-50">
+                    <i class="ph ph-ghost text-6xl mb-4"></i>
+                    <p>Perpustakaan kosong.</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- VIEW 2: DETAIL PAGE -->
+        <main id="view-detail" class="absolute inset-0 overflow-y-auto bg-white hidden z-20">
+            <div class="max-w-5xl mx-auto px-6 py-10">
+                <button onclick="showView('storefront')" class="mb-8 flex items-center gap-2 text-sm text-slate-500 hover:text-sky-600 transition">
+                    <i class="ph-bold ph-arrow-left"></i> Kembali ke Rak
+                </button>
+
+                <div class="flex flex-col md:flex-row gap-10">
+                    <!-- Left: Cover -->
+                    <div class="w-full md:w-1/3 flex flex-col items-center">
+                        <div id="detail-cover" class="w-56 h-80 rounded shadow-2xl mb-6 relative overflow-hidden flex flex-col p-6 text-center text-white bg-cover bg-center bg-slate-800">
+                            <div class="book-spine"></div>
+                            <div class="mt-4 border-b border-white/30 pb-4 relative z-10 backdrop-blur-sm bg-black/30 p-2 rounded">
+                                <h2 id="detail-cover-title" class="font-display font-bold text-xl leading-tight line-clamp-4">Title</h2>
+                            </div>
+                            <p id="detail-cover-author" class="mt-4 font-sans text-xs uppercase tracking-widest opacity-80 relative z-10 backdrop-blur-sm bg-black/30 px-2 rounded">Author</p>
+                            <div class="absolute inset-0 bg-black/10"></div>
+                        </div>
+                        
+                        <div class="flex gap-3 w-full max-w-xs">
+                            <button onclick="openReader()" class="flex-1 bg-sky-600 hover:bg-sky-500 text-white py-3 rounded-md font-bold text-sm shadow transition flex justify-center items-center gap-2">
+                                <i class="ph-fill ph-book-open"></i> BACA
+                            </button>
+                            <button onclick="openStudio()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-md font-bold text-sm border border-slate-300 transition flex justify-center items-center gap-2">
+                                <i class="ph-fill ph-pencil-simple"></i> EDIT
+                            </button>
+                        </div>
+                        <button onclick="exportBookHTML()" class="mt-3 text-sky-600 text-xs font-semibold hover:underline flex items-center gap-1">
+                            <i class="ph ph-file-html"></i> Export HTML
+                        </button>
+                    </div>
+
+                    <!-- Right: Metadata & Synopsis -->
+                    <div class="w-full md:w-2/3">
+                        <h1 id="detail-title" class="font-display text-4xl md:text-5xl font-bold text-slate-900 mb-2">Judul Buku</h1>
+                        <p class="text-lg text-slate-500 mb-6">oleh <span id="detail-author" class="text-sky-600 font-semibold">Penulis</span></p>
+                        
+                        <div class="flex flex-wrap gap-4 mb-8 text-xs font-medium text-slate-600 border-y border-slate-100 py-4">
+                            <div class="flex items-center gap-1"><i class="ph-fill ph-tag text-slate-400"></i> <span id="detail-genre">Genre</span></div>
+                            <div class="flex items-center gap-1"><i class="ph-fill ph-files text-slate-400"></i> <span id="detail-chapters">0</span> Bab</div>
+                            <div class="flex items-center gap-1"><i class="ph-fill ph-text-t text-slate-400"></i> <span id="detail-words">0</span> Kata</div>
+                            <div class="flex items-center gap-1"><i class="ph-fill ph-calendar text-slate-400"></i> <span id="detail-date">Date</span></div>
+                        </div>
+
+                        <div class="mb-8">
+                            <h3 class="font-bold text-slate-900 mb-3 text-sm uppercase tracking-wide">Sinopsis</h3>
+                            <p id="detail-synopsis" class="font-serif text-slate-600 leading-relaxed text-lg italic">
+                                Belum ada sinopsis.
+                            </p>
+                        </div>
+
+                        <!-- Mini Editor for Metadata -->
+                        <div class="bg-slate-50 p-6 rounded-lg border border-slate-200">
+                            <h3 class="font-bold text-slate-700 mb-4 text-xs uppercase flex items-center gap-2">
+                                <i class="ph-fill ph-gear"></i> Metadata Buku
+                            </h3>
+                            <!-- FIX: Added Title and Author Inputs -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <label class="text-[10px] text-slate-400 uppercase font-bold block mb-1">Judul Buku</label>
+                                    <input type="text" id="edit-title" class="w-full p-2 text-sm border border-slate-300 rounded bg-white font-bold text-slate-800" oninput="updateMetadata()">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] text-slate-400 uppercase font-bold block mb-1">Nama Penulis</label>
+                                    <input type="text" id="edit-author" class="w-full p-2 text-sm border border-slate-300 rounded bg-white" oninput="updateMetadata()">
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <label class="text-[10px] text-slate-400 uppercase font-bold block mb-1">Genre</label>
+                                    <select id="edit-genre" class="w-full p-2 text-sm border border-slate-300 rounded bg-white" onchange="updateMetadata()">
+                                        <option value="Fiksi">Fiksi</option>
+                                        <option value="Non-Fiksi">Non-Fiksi</option>
+                                        <option value="Fantasi">Fantasi</option>
+                                        <option value="Sci-Fi">Sci-Fi</option>
+                                        <option value="Romance">Romance</option>
+                                        <option value="Horror">Horror</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="text-[10px] text-slate-400 uppercase font-bold block mb-1">URL Sampul (Gambar)</label>
+                                    <input type="text" id="edit-cover-url" class="w-full p-2 text-sm border border-slate-300 rounded bg-white placeholder-gray-400" placeholder="https://..." oninput="updateMetadata()">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-400 uppercase font-bold block mb-1">Edit Sinopsis</label>
+                                <textarea id="edit-synopsis" rows="3" class="w-full p-2 text-sm border border-slate-300 rounded bg-white resize-none" oninput="updateMetadata()"></textarea>
+                            </div>
+                            <div class="mt-4 pt-4 border-t border-slate-200 flex justify-end">
+                                <button onclick="deleteBook()" class="text-red-500 text-xs font-bold hover:text-red-700 flex items-center gap-1">
+                                    <i class="ph ph-trash"></i> Hapus Buku Ini
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- VIEW 3: READER MODE -->
+        <main id="view-reader" class="absolute inset-0 bg-white hidden z-50 flex flex-col reader-transition">
+            <div class="h-14 border-b border-gray-100 flex justify-between items-center px-6 shrink-0 bg-opacity-90 backdrop-blur-sm sticky top-0 z-10" id="reader-controls">
+                <button onclick="closeReader()" class="text-slate-500 hover:text-slate-900 flex items-center gap-2 text-sm font-medium">
+                    <i class="ph-bold ph-x"></i> Tutup
+                </button>
+                <div class="font-serif text-sm font-bold truncate max-w-[200px]" id="reader-book-title">Judul Buku</div>
+                <div class="flex gap-4 items-center">
+                     <button onclick="changeReaderTheme('light')" class="w-4 h-4 rounded-full bg-white border border-gray-300 hover:scale-110 transition"></button>
+                     <button onclick="changeReaderTheme('sepia')" class="w-4 h-4 rounded-full bg-[#f4ecd8] border border-amber-200 hover:scale-110 transition"></button>
+                     <button onclick="changeReaderTheme('dark')" class="w-4 h-4 rounded-full bg-slate-900 border border-slate-700 hover:scale-110 transition"></button>
+                     <div class="h-4 w-[1px] bg-gray-300 mx-1"></div>
+                     <button onclick="changeFontSize(-1)" class="text-slate-500 hover:text-slate-900"><i class="ph-bold ph-text-a-underline text-xs"></i></button>
+                     <button onclick="changeFontSize(1)" class="text-slate-500 hover:text-slate-900"><i class="ph-bold ph-text-a-underline text-lg"></i></button>
+                </div>
+            </div>
+            
+            <div id="reader-scroll-area" class="flex-1 overflow-y-auto p-6 md:p-12 scroll-smooth">
+                <div class="max-w-2xl mx-auto py-10 min-h-screen prose prose-lg" id="reader-content-body">
+                    <!-- Content Injected Here -->
+                </div>
+            </div>
+        </main>
+
+        <!-- VIEW 4: STUDIO (RICH TEXT EDITOR) -->
+        <main id="view-studio" class="absolute inset-0 bg-white flex hidden z-30">
+            <!-- Sidebar -->
+            <aside class="w-64 bg-slate-50 border-r border-slate-200 flex flex-col h-full shrink-0">
+                <div class="p-4 border-b border-slate-200">
+                    <button onclick="showDetailView(currentBookId)" class="text-xs font-bold text-slate-500 hover:text-sky-600 flex items-center gap-1 mb-2">
+                        <i class="ph ph-arrow-left"></i> KEMBALI
+                    </button>
+                    <h2 class="font-display font-bold text-slate-800 truncate" id="studio-sidebar-title">Judul</h2>
+                </div>
+                
+                <div class="flex-1 overflow-y-auto p-2">
+                    <div class="flex justify-between items-center px-2 py-2">
+                        <span class="text-[10px] uppercase font-bold text-slate-400">Daftar Bab</span>
+                        <button onclick="addChapter()" class="text-sky-600 hover:text-sky-700 p-1"><i class="ph-bold ph-plus"></i></button>
+                    </div>
+                    <ul id="chapter-list" class="space-y-1"></ul>
+                </div>
+
+                <!-- Word Counter -->
+                <div class="p-3 border-t border-slate-200 bg-white">
+                    <div class="text-[10px] text-slate-400 uppercase font-bold text-center">
+                        Total Kata (Bab Ini)
+                    </div>
+                    <div class="text-center font-mono text-xl text-slate-700 font-bold" id="word-count-display">
+                        0
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Editor -->
+            <section class="flex-1 flex flex-col h-full bg-white relative">
+                <div class="px-8 py-3 border-b border-slate-100 flex justify-between items-center bg-white z-10">
+                    <input type="text" id="chapter-title-input" class="font-display font-bold text-2xl bg-transparent border-none focus:ring-0 w-full placeholder-slate-300 text-slate-800" placeholder="Judul Bab..." oninput="saveEditorContent()">
+                    <span id="save-indicator" class="text-xs font-mono text-slate-400">Disimpan</span>
+                </div>
+
+                <!-- Rich Text Toolbar -->
+                <div class="px-8 py-2 border-b border-slate-100 bg-slate-50 flex items-center gap-2 sticky top-0 z-20">
+                    <button onclick="formatDoc('bold')" class="p-1.5 hover:bg-slate-200 rounded text-slate-600" title="Bold"><i class="ph-bold ph-text-b"></i></button>
+                    <button onclick="formatDoc('italic')" class="p-1.5 hover:bg-slate-200 rounded text-slate-600" title="Italic"><i class="ph-bold ph-text-italic"></i></button>
+                    <button onclick="formatDoc('underline')" class="p-1.5 hover:bg-slate-200 rounded text-slate-600" title="Underline"><i class="ph-bold ph-text-u"></i></button>
+                    <div class="w-[1px] h-4 bg-slate-300 mx-2"></div>
+                    <button onclick="formatDoc('formatBlock', 'H2')" class="p-1.5 hover:bg-slate-200 rounded text-slate-600 font-bold text-xs">H1</button>
+                    <button onclick="formatDoc('formatBlock', 'H3')" class="p-1.5 hover:bg-slate-200 rounded text-slate-600 font-bold text-xs">H2</button>
+                    <button onclick="formatDoc('formatBlock', 'blockquote')" class="p-1.5 hover:bg-slate-200 rounded text-slate-600" title="Quote"><i class="ph-bold ph-quotes"></i></button>
+                </div>
+                
+                <!-- CONTENTEDITABLE DIV (Rich Text Area) -->
+                <div id="editor-textarea" class="flex-1 w-full p-8 md:p-12 overflow-y-auto font-serif text-lg leading-loose text-slate-700 outline-none prose max-w-none" contenteditable="true" placeholder="Mulai menulis..." oninput="saveEditorContent()"></div>
+            </section>
+        </main>
+
+    </div>
+
+<script>
+    // --- DATA & STATE ---
+    let books = [];
+    let currentBookId = null;
+    let currentChapterIndex = 0;
+
+    function init() {
+        const saved = localStorage.getItem('indie_press_pro_v2');
+        if (saved) {
+            books = JSON.parse(saved);
+        } else {
+            // Demo Content
+            books = [{
+                id: Date.now(),
+                title: "Catatan Kaki Seorang Penulis",
+                author: "Admin",
+                genre: "Non-Fiksi",
+                coverUrl: "", 
+                synopsis: "Contoh naskah dengan fitur Rich Text. Coba edit bab pertama untuk melihat format Bold dan Italic.",
+                createdAt: new Date().toLocaleDateString(),
+                chapters: [
+                    { title: "Bab 1: Formatting", content: "<p>Ini adalah teks biasa.</p><p><b>Ini adalah teks tebal (Bold) untuk penekanan.</b></p><p><i>Ini adalah teks miring (Italic) untuk dialog batin.</i></p><blockquote>Kutipan indah bisa diletakkan di sini.</blockquote>" }
+                ]
+            }];
+            saveData();
+        }
+        renderStorefront();
+    }
+
+    // --- NAVIGATION ---
+    function showView(viewId) {
+        ['view-storefront', 'view-detail', 'view-reader', 'view-studio'].forEach(id => {
+            const el = document.getElementById(id);
+            if(el) el.classList.add('hidden');
+        });
+        const target = document.getElementById(viewId);
+        if(target) target.classList.remove('hidden');
+        
+        if(viewId === 'storefront') renderStorefront();
+    }
+
+    // --- RICH TEXT LOGIC ---
+    function formatDoc(cmd, value = null) {
+        document.execCommand(cmd, false, value);
+        document.getElementById('editor-textarea').focus();
+        saveEditorContent();
+    }
+
+    // --- STOREFRONT ---
+    function renderStorefront(filterText = '', genreFilter = 'all') {
+        const grid = document.getElementById('book-grid');
+        grid.innerHTML = '';
+        
+        let filtered = books.filter(b => {
+            const matchText = (b.title + b.author).toLowerCase().includes(filterText.toLowerCase());
+            const matchGenre = genreFilter === 'all' || b.genre === genreFilter;
+            return matchText && matchGenre;
+        });
+
+        if (filtered.length === 0) {
+            document.getElementById('empty-state').classList.remove('hidden');
+        } else {
+            document.getElementById('empty-state').classList.add('hidden');
+            
+            filtered.forEach(book => {
+                const card = document.createElement('div');
+                card.className = "book-card group cursor-pointer flex flex-col items-center w-full";
+                card.onclick = () => showDetailView(book.id);
+                
+                // Cover Logic: Image or Default Color
+                let bgStyle = book.coverUrl ? `background-image: url('${book.coverUrl}');` : `background-color: #1e293b;`;
+                
+                card.innerHTML = `
+                    <div class="book-inner relative w-full aspect-[2/3] rounded-r-lg rounded-l-sm mb-4 flex flex-col p-4 text-white shadow-md border-l border-white/10" style="${bgStyle}">
+                        <div class="book-spine"></div>
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent rounded-r-lg"></div>
+                        
+                        ${!book.coverUrl ? `
+                        <div class="mt-2 pb-2 border-b border-white/20 relative z-10">
+                            <h3 class="font-display font-bold text-lg leading-tight line-clamp-3 drop-shadow-md">${book.title}</h3>
+                        </div>
+                        <p class="mt-2 font-sans text-[10px] uppercase tracking-widest opacity-80 relative z-10">${book.author}</p>
+                        ` : ''}
+                        
+                        <div class="mt-auto pt-2 flex justify-between items-end relative z-10">
+                            <span class="text-[10px] bg-black/40 backdrop-blur-sm px-2 py-0.5 rounded border border-white/10">${book.genre || 'Umum'}</span>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+    }
+
+    function createNewBook() {
+        const newBook = {
+            id: Date.now(),
+            title: "Naskah Baru",
+            author: "Saya",
+            genre: "Fiksi",
+            coverUrl: "",
+            synopsis: "Tulis sinopsis...",
+            createdAt: new Date().toLocaleDateString(),
+            chapters: [{ title: "Bab 1", content: "<p>Mulai menulis...</p>" }]
+        };
+        books.unshift(newBook);
+        saveData();
+        showDetailView(newBook.id);
+    }
+
+    // --- DETAIL VIEW ---
+    function showDetailView(id) {
+        currentBookId = id;
+        const book = books.find(b => b.id === id);
+        
+        // Cover Logic
+        const coverEl = document.getElementById('detail-cover');
+        if (book.coverUrl) {
+            coverEl.style.backgroundImage = `url('${book.coverUrl}')`;
+            coverEl.style.backgroundColor = 'transparent';
+        } else {
+            coverEl.style.backgroundImage = 'none';
+            coverEl.style.backgroundColor = '#1e293b';
+        }
+
+        document.getElementById('detail-cover-title').innerText = book.title;
+        document.getElementById('detail-cover-author').innerText = book.author;
+        document.getElementById('detail-title').innerText = book.title;
+        document.getElementById('detail-author').innerText = book.author;
+        document.getElementById('detail-genre').innerText = book.genre || 'Umum';
+        document.getElementById('detail-chapters').innerText = book.chapters.length;
+        
+        // Calculate Total Words
+        let totalWords = 0;
+        book.chapters.forEach(c => {
+            const text = c.content.replace(/<[^>]*>/g, ' '); // Strip HTML
+            totalWords += text.split(/\s+/).filter(w => w.length > 0).length;
+        });
+        document.getElementById('detail-words').innerText = totalWords;
+
+        document.getElementById('detail-date').innerText = book.createdAt;
+        document.getElementById('detail-synopsis').innerText = book.synopsis;
+
+        // Inputs (FIXED: Added Title and Author)
+        document.getElementById('edit-title').value = book.title;
+        document.getElementById('edit-author').value = book.author;
+        document.getElementById('edit-genre').value = book.genre || 'Fiksi';
+        document.getElementById('edit-cover-url').value = book.coverUrl || '';
+        document.getElementById('edit-synopsis').value = book.synopsis;
+        
+        showView('view-detail');
+    }
+
+    function updateMetadata() {
+        if(!currentBookId) return;
+        const book = books.find(b => b.id === currentBookId);
+        
+        // Update Model
+        book.title = document.getElementById('edit-title').value;
+        book.author = document.getElementById('edit-author').value;
+        book.genre = document.getElementById('edit-genre').value;
+        book.coverUrl = document.getElementById('edit-cover-url').value;
+        book.synopsis = document.getElementById('edit-synopsis').value;
+        
+        saveData();
+
+        // Update UI Real-time
+        document.getElementById('detail-title').innerText = book.title;
+        document.getElementById('detail-author').innerText = book.author;
+        document.getElementById('detail-cover-title').innerText = book.title;
+        document.getElementById('detail-cover-author').innerText = book.author;
+        
+        // Update Cover
+        const coverEl = document.getElementById('detail-cover');
+        if (book.coverUrl) {
+            coverEl.style.backgroundImage = `url('${book.coverUrl}')`;
+            coverEl.style.backgroundColor = 'transparent';
+        } else {
+            coverEl.style.backgroundImage = 'none';
+            coverEl.style.backgroundColor = '#1e293b';
+        }
+    }
+
+    // --- STUDIO LOGIC ---
+    function openStudio() {
+        currentChapterIndex = 0;
+        const book = books.find(b => b.id === currentBookId);
+        document.getElementById('studio-sidebar-title').innerText = book.title;
+        renderChapterList();
+        loadChapter(0);
+        showView('view-studio');
+    }
+
+    function renderChapterList() {
+        const book = books.find(b => b.id === currentBookId);
+        const list = document.getElementById('chapter-list');
+        list.innerHTML = '';
+        
+        book.chapters.forEach((chap, idx) => {
+            const li = document.createElement('li');
+            const activeClass = idx === currentChapterIndex ? 'bg-sky-50 text-sky-700 border-l-4 border-sky-600 font-semibold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-transparent';
+            li.className = `px-3 py-2 text-sm cursor-pointer flex justify-between group transition-all ${activeClass}`;
+            li.onclick = () => loadChapter(idx);
+            li.innerHTML = `
+                <span class="truncate w-32">${idx + 1}. ${chap.title || 'Untitled'}</span>
+                <i onclick="event.stopPropagation(); deleteChapter(${idx})" class="ph-bold ph-trash text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+            `;
+            list.appendChild(li);
+        });
+    }
+
+    function loadChapter(idx) {
+        saveEditorContent(); // Backup current before switch
+        currentChapterIndex = idx;
+        const book = books.find(b => b.id === currentBookId);
+        
+        document.getElementById('chapter-title-input').value = book.chapters[idx].title;
+        document.getElementById('editor-textarea').innerHTML = book.chapters[idx].content; // Use innerHTML
+        updateWordCount();
+        renderChapterList();
+    }
+
+    function saveEditorContent() {
+        const book = books.find(b => b.id === currentBookId);
+        book.chapters[currentChapterIndex].title = document.getElementById('chapter-title-input').value;
+        book.chapters[currentChapterIndex].content = document.getElementById('editor-textarea').innerHTML; // Save HTML
+        
+        updateWordCount();
+
+        document.getElementById('save-indicator').innerText = "Menyimpan...";
+        clearTimeout(window.saveTimer);
+        window.saveTimer = setTimeout(() => {
+            saveData();
+            document.getElementById('save-indicator').innerText = "Tersimpan";
+            const listItems = document.getElementById('chapter-list').children;
+            if(listItems[currentChapterIndex]) {
+                 listItems[currentChapterIndex].querySelector('span').innerText = `${currentChapterIndex+1}. ${book.chapters[currentChapterIndex].title}`;
+            }
+        }, 800);
+    }
+
+    function updateWordCount() {
+        const content = document.getElementById('editor-textarea').innerText || "";
+        const words = content.split(/\s+/).filter(w => w.length > 0).length;
+        document.getElementById('word-count-display').innerText = words;
+    }
+
+    function addChapter() {
+        const book = books.find(b => b.id === currentBookId);
+        book.chapters.push({ title: "Bab Baru", content: "<p></p>" });
+        saveData();
+        renderChapterList();
+        loadChapter(book.chapters.length - 1);
+    }
+
+    function deleteChapter(idx) {
+        if(!confirm("Hapus bab ini?")) return;
+        const book = books.find(b => b.id === currentBookId);
+        if(book.chapters.length <= 1) return alert("Minimal satu bab.");
+        book.chapters.splice(idx, 1);
+        saveData();
+        if(currentChapterIndex >= book.chapters.length) currentChapterIndex = book.chapters.length - 1;
+        loadChapter(currentChapterIndex);
+    }
+    
+    function deleteBook() {
+        if(!confirm("Hapus buku ini secara permanen?")) return;
+        books = books.filter(b => b.id !== currentBookId);
+        saveData();
+        showView('storefront');
+    }
+
+    // --- BACKUP SYSTEM (JSON) ---
+    function exportData() {
+        const dataStr = JSON.stringify(books, null, 2);
+        const blob = new Blob([dataStr], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `indie_press_backup_${new Date().toISOString().slice(0,10)}.json`;
+        a.click();
+    }
+
+    function importData(input) {
+        const file = input.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const importedBooks = JSON.parse(e.target.result);
+                if (confirm(`Timpa perpustakaan saat ini dengan ${importedBooks.length} buku dari backup?`)) {
+                    books = importedBooks;
+                    saveData();
+                    renderStorefront();
+                    alert("Data berhasil dipulihkan!");
+                }
+            } catch (err) {
+                alert("File backup tidak valid.");
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    // --- EXPORT HTML EBOOK ---
+    function exportBookHTML() {
+        const book = books.find(b => b.id === currentBookId);
+        let html = `<html><head><title>${book.title}</title>
+        <style>body{font-family: 'Merriweather', serif; max-width:700px; margin:50px auto; line-height:1.6; padding:20px; color:#333;}
+        h1{text-align:center; margin-top:20vh; font-size:3em;} .author{text-align:center; font-style:italic; margin-bottom:100px;}
+        h2{page-break-before:always; margin-top:50px; border-bottom:1px solid #ddd; padding-bottom:10px;}
+        p{margin-bottom:1em;} blockquote{border-left:4px solid #ccc; padding-left:1em; font-style:italic;}
+        </style></head><body>
+        <h1>${book.title}</h1><div class="author">${book.author}</div>`;
+        
+        book.chapters.forEach(c => {
+            html += `<h2>${c.title}</h2>` + c.content;
+        });
+        html += '</body></html>';
+        
+        const blob = new Blob([html], {type: 'text/html'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `${book.title}.html`;
+        a.click();
+    }
+
+    // --- READER MODE ---
+    function openReader() {
+        const book = books.find(b => b.id === currentBookId);
+        document.getElementById('reader-book-title').innerText = book.title;
+        const container = document.getElementById('reader-content-body');
+        
+        let content = `<div class="text-center mb-20"><h1 class="font-display text-4xl font-bold mb-4">${book.title}</h1><p class="font-sans text-sm uppercase tracking-widest opacity-60">${book.author}</p></div>`;
+        
+        book.chapters.forEach(c => {
+            content += `<div class="mb-16 pb-8 border-b border-current border-opacity-10"><h2 class="font-display text-2xl font-bold mb-6">${c.title}</h2><div class="font-serif">${c.content}</div></div>`;
+        });
+        
+        container.innerHTML = content;
+        showView('view-reader');
+    }
+    
+    function closeReader() { showView('view-detail'); }
+    let currentFontSize = 18;
+    function changeFontSize(d) { currentFontSize += d; document.getElementById('reader-content-body').style.fontSize = `${currentFontSize}px`; }
+    function changeReaderTheme(t) {
+        const view = document.getElementById('view-reader');
+        view.className = `absolute inset-0 z-50 flex flex-col reader-transition overflow-hidden ${t==='dark'?'bg-slate-900 text-slate-300': t==='sepia'?'bg-[#f4ecd8] text-[#5b4636]':'bg-white text-slate-900'}`;
+    }
+
+    function filterGenre(g) { renderStorefront(document.getElementById('search-input').value, g); }
+    function filterBooks() { renderStorefront(document.getElementById('search-input').value); }
+    function saveData() { localStorage.setItem('indie_press_pro_v2', JSON.stringify(books)); }
+
+    init();
+</script>
+</body>
+</html>
